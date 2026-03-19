@@ -11,9 +11,9 @@ Maintain a durable, low-pollution ledger split into **three books**:
 - **Changes**: what changed + why + evidence + impact + rollback
 
 Backends (configurable):
-- **local**: write markdown only (always works)
-- **drive**: write Google Docs in Drive (requires Drive backend)
-- **both**: write local + drive
+- **local**: write markdown only (always works) — **recommended default**
+- **drive**: write Google Docs in Drive (optional; requires Drive backend)
+- **both**: dual-write (only if you really need Drive collaboration; otherwise use local + agent-generated summaries)
 
 ## Key conventions (write these into entries)
 ### Project tagging (normalized, case-insensitive)
@@ -86,17 +86,16 @@ python3 skills/project-memory-ledger/scripts/ledger.py update-prd \
 ```
 This writes to local `ledgers/PRD_PATCHES.md` (local/both) and prints the proposal.
 
-## Drive access note (important)
-Drive mode is a **pluggable backend**.
+## Drive access note (optional)
+Drive mode is a **pluggable backend** and is optional.
 
 ### Drive backend options (not hard-bound)
-- **Option 1 (default / v1 implemented)**: `gws` CLI (must be installed + authenticated)
+- **Option 1 (v1 implemented)**: `gws` CLI (must be installed + authenticated)
 - **Option 2**: Google API / service account (good for servers / CI)
 - **Option 3**: Third-party Drive tooling (user-chosen)
 
-### Preflight behavior
-- v1 currently relies on `init`/runtime errors from `gws` when Drive auth is missing.
-- If Drive is not available, switch `backend` to `local` to continue without blocking.
+### Recommended practice
+If you don’t need humans editing the ledger, prefer **local**. If humans want to participate, keep the ledger local and have the agent generate Drive summaries (propose-only style).
 
 ## What to record (assistant-owned scope)
 - Drive structure changes (create/move/permissions)
