@@ -436,7 +436,6 @@ def main():
                     f"- **Drive Folder**: https://drive.google.com/drive/folders/{scaffold_info['project_folder_id']}\n"
                     f"- **Charter**: https://docs.google.com/document/d/{scaffold_info['charter_doc_id']}/edit\n"
                     f"- **PRD**: https://docs.google.com/document/d/{scaffold_info['prd_doc_id']}/edit\n"
-                    f"- **SDD**: https://docs.google.com/document/d/{scaffold_info['sdd_doc_id']}/edit\n"
                     f"- **Backlog Sheet**: https://docs.google.com/spreadsheets/d/{scaffold_info['backlog_sheet_id']}/edit\n"
                 )
             else:
@@ -444,7 +443,6 @@ def main():
                     f"- **Local Project Dir**: {scaffold_info['project_dir']}\n"
                     f"- **Charter**: {scaffold_info['charter_path']}\n"
                     f"- **PRD**: {scaffold_info['prd_path']}\n"
-                    f"- **SDD**: {scaffold_info['sdd_path']}\n"
                     f"- **Backlog**: {scaffold_info['backlog_path']}\n"
                 )
             append_local(cfg, 'projects', entry_text)
