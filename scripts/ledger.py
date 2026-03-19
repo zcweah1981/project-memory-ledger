@@ -324,6 +324,32 @@ def main():
             print(str(local_path(cfg, args.doc)))
         return
 
+    if args.cmd == "update-prd":
+        cfg = init(args.config)
+        backend = cfg.get("backend")
+        project_slug = normalize_project(args.project) or args.project
+
+        if args.mode != 'propose':
+            raise SystemExit('update-prd --mode apply is not implemented yet (propose-only)')
+
+        # Minimal v1: generate a proposal skeleton and store it in local PRD_PATCHES.md (and optionally print).
+        stamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+        proposal = (
+            f"\n\n## PRD Patch Proposal ({stamp})\n"
+            f"- **Project**: {project_slug}\n"
+            f"- **Summary**: <what changed and why>\n"
+            f"- **Evidence links**: <Decision/Change entries or logs>\n"
+            f"- **PRD sections impacted**: <scope/non-goals/milestones/etc>\n"
+            f"- **Proposed edits**:\n  - ...\n"
+        )
+
+        if backend in ('local','both'):
+            append_local(cfg, 'prd_patches', proposal)
+
+        # In drive/both, we do not auto-apply; we just print the proposal path/doc and rely on manual apply.
+        print(proposal.strip())
+        return
+
     if args.cmd == "register-project":
         cfg = init(args.config)
         backend = cfg.get("backend")

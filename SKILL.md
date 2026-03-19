@@ -66,7 +66,7 @@ Local mode writes:
 - `ledgers/PROJECTS.md` (when registering projects)
 
 ### 4) Register a project (project registry)
-Use when something is worth upgrading into a maintained engineering project (creates a registry entry and records the decision):
+Use when something is worth upgrading into a maintained engineering project (creates a registry entry and records the decision). In drive/both, it also scaffolds a standard Drive folder structure by default:
 ```bash
 python3 skills/project-memory-ledger/scripts/ledger.py register-project \
   --config /root/.openclaw/workspace-nero/config/project_memory_ledger.json \
@@ -75,6 +75,16 @@ python3 skills/project-memory-ledger/scripts/ledger.py register-project \
   --interfaces "hunter-system ↔ keyword-engine" \
   --notes "optional"
 ```
+
+### 5) Update PRD (propose-only)
+Generate a PRD patch proposal (no auto-apply in v1):
+```bash
+python3 skills/project-memory-ledger/scripts/ledger.py update-prd \
+  --config /root/.openclaw/workspace-nero/config/project_memory_ledger.json \
+  --project "Keyword Engine" \
+  --mode propose
+```
+This writes to local `ledgers/PRD_PATCHES.md` (local/both) and prints the proposal.
 
 ## Drive access note (important)
 Drive mode is a **pluggable backend**.
