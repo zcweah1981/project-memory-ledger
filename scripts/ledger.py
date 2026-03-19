@@ -285,6 +285,12 @@ def init_drive_docs(cfg: dict) -> dict:
 
 def init(cfg_path: str) -> dict:
     cfg = load_config(cfg_path)
+
+    # language default + hint
+    if not cfg.get('language'):
+        cfg['language'] = 'en'
+        print("[project-memory-ledger] config.language missing → defaulting to 'en' (set language=zh for Chinese)", file=sys.stderr)
+
     backend = (cfg.get("backend") or "local").lower()
     if backend not in ("local", "drive"):
         backend = "local"

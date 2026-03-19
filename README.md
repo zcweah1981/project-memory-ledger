@@ -46,7 +46,7 @@ Recommended path:
 Minimal config (local-only):
 ```json
 {
-  "language": "zh",
+  "language": "en",
   "backend": "local",
   "default_project": "project-memory-ledger",
   "local_dir": "/root/.openclaw/workspace-nero/ledgers",
@@ -63,10 +63,10 @@ Minimal config (local-only):
 }
 ```
 
-Drive/both config (adds `shared_folder_id`):
+Drive config (adds `shared_folder_id`):
 ```json
 {
-  "language": "zh",
+  "language": "en",
   "backend": "both",
   "default_project": "project-memory-ledger",
   "local_dir": "/root/.openclaw/workspace-nero/ledgers",
