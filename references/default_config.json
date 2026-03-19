@@ -4,8 +4,8 @@
   "default_project": "project-memory-ledger",
   "shared_folder_id": "",
   "projects_root_folder_id": "",
-  "projects_root_dir": "/root/.openclaw/workspace-nero/projects",
-  "local_dir": "/root/.openclaw/workspace-nero/ledgers",
+  "projects_root_dir": "./projects",
+  "local_dir": "./ledgers",
   "docs": {
     "invariants_doc_id": "",
     "decision_log_doc_id": "",
