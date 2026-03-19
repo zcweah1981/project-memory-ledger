@@ -1,13 +1,17 @@
 # Project Memory Ledger (OpenClaw Skill)
 
+AI-ready engineering project ledger for long-term memory + evidence chains (Invariants / Decisions / Changes). Dual-write to local Markdown and Google Drive Docs with rollback + full traceability.
+
+**Keywords:** project ledger, engineering ledger, change log, decision log, invariants, traceability, rollback, evidence chain, agent memory, long-term memory, LLM ops, OpenClaw, Google Drive, Markdown
+
 Durable, low-pollution **engineering project memory** with evidence + rollback.
 
-This skill maintains a ledger split into three “books”:
+This skill maintains **three ledgers** (same mental model across local/drive/both):
 - **Invariants**: hard rules / stable facts
 - **Decisions**: tradeoffs + rationale
 - **Changes**: what changed + why + evidence + impact + rollback
 
-It supports multiple storage backends:
+Storage backends:
 - **local**: markdown files only (always works)
 - **drive**: Google Docs in Drive (requires a Drive backend)
 - **both**: write local + drive
@@ -16,7 +20,7 @@ It supports multiple storage backends:
 
 ---
 
-## Files
+## Repository layout
 
 - Skill folder: `skills/project-memory-ledger/`
 - Main script: `skills/project-memory-ledger/scripts/ledger.py`
