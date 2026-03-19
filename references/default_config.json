@@ -1,0 +1,17 @@
+{
+  "language": "zh",
+  "backend": "drive",
+  "default_project": "project-memory-ledger",
+  "shared_folder_id": "1h0lh5kim0Zi3IFS257lxpc_n1r6JXb-G",
+  "local_dir": "/root/.openclaw/workspace-nero/ledgers",
+  "docs": {
+    "invariants_doc_id": "",
+    "decision_log_doc_id": "",
+    "change_log_doc_id": ""
+  },
+  "doc_titles": {
+    "invariants": "System Invariants & Rules（总账）",
+    "decisions": "Decision Log（总账）",
+    "changes": "Change Log（总账）"
+  }
+}
