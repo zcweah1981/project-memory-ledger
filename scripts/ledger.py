@@ -39,13 +39,26 @@ import os
 import re
 import shlex
 import subprocess
+import sys
+import shutil
 from pathlib import Path
 from datetime import datetime
 
 
-def run(cmd: str) -> str:
-    p = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+def run(args: list[str]) -> str:
+    """Run a command without using a shell (safer)."""
+    p = subprocess.run(args, check=True, capture_output=True, text=True)
     return p.stdout.strip()
+
+
+def require_bin(bin_name: str) -> None:
+    if shutil.which(bin_name) is None:
+        raise SystemExit(f"Missing required binary: {bin_name}. Please install it or switch backend=local.")
+
+
+def run_gws(args: list[str]) -> str:
+    require_bin('gws')
+    return run(["gws", *args])
 
 
 def normalize_project(p: str | None) -> str | None:
@@ -134,44 +147,39 @@ def append_local(cfg: dict, doc_key: str, text: str) -> None:
 def find_doc_in_folder(folder_id: str, title: str) -> str | None:
     q = f"'{folder_id}' in parents and name = '{title}' and mimeType='application/vnd.google-apps.document' and trashed=false"
     params = json.dumps({"q": q, "pageSize": 5, "fields": "files(id,name)"})
-    out = run("gws drive files list --params " + shlex.quote(params))
+    out = run_gws(['drive','files','list','--params', params])
     files = jx(out).get("files", [])
     return files[0]["id"] if files else None
 
 
 def create_doc(title: str) -> str:
-    out = run("gws docs documents create --json " + shlex.quote(json.dumps({"title": title})))
+    out = run_gws(['docs','documents','create','--json', json.dumps({'title': title})])
     return jx(out)["documentId"]
 
 
 def move_to_folder(file_id: str, folder_id: str) -> None:
-    meta = jx(
-        run(
-            "gws drive files get --params "
-            + shlex.quote(json.dumps({"fileId": file_id, "fields": "parents"}))
-        )
-    )
+    meta = jx(run_gws(['drive','files','get','--params', json.dumps({'fileId': file_id, 'fields': 'parents'})]))
     parents = meta.get("parents", [])
     upd = {"fileId": file_id, "addParents": folder_id}
     if parents:
         upd["removeParents"] = ",".join(parents)
-    run("gws drive files update --params " + shlex.quote(json.dumps(upd)) + " --json {}")
+    run_gws(['drive','files','update','--params', json.dumps(upd), '--json', '{}'])
 
 
 def ensure_drive_folder(parent_id: str, name: str) -> str:
     q = f"'{parent_id}' in parents and name='{name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
     params = json.dumps({"q": q, "pageSize": 5, "fields": "files(id,name)"})
-    out = run("gws drive files list --params " + shlex.quote(params))
+    out = run_gws(['drive','files','list','--params', params])
     files = jx(out).get('files', [])
     if files:
         return files[0]['id']
     body = json.dumps({"name": name, "mimeType": "application/vnd.google-apps.folder", "parents": [parent_id]})
-    out = run("gws drive files create --json " + shlex.quote(body))
+    out = run_gws(['drive','files','create','--json', body])
     return jx(out)['id']
 
 
 def create_gdoc_in_folder(folder_id: str, title: str, initial_text: str = "") -> str:
-    out = run("gws docs documents create --json " + shlex.quote(json.dumps({"title": title})))
+    out = run_gws(['docs','documents','create','--json', json.dumps({'title': title})])
     doc_id = jx(out)['documentId']
     move_to_folder(doc_id, folder_id)
     if initial_text:
@@ -180,7 +188,7 @@ def create_gdoc_in_folder(folder_id: str, title: str, initial_text: str = "") ->
 
 
 def create_gsheet_in_folder(folder_id: str, title: str) -> str:
-    out = run("gws sheets spreadsheets create --json " + shlex.quote(json.dumps({"properties": {"title": title}})))
+    out = run_gws(['sheets','spreadsheets','create','--json', json.dumps({'properties': {'title': title}})])
     sid = jx(out)['spreadsheetId']
     move_to_folder(sid, folder_id)
     return sid
@@ -206,7 +214,6 @@ def scaffold_drive_project(cfg: dict, slug: str, display_name: str, purpose: str
         'project_folder_id': project_folder_id,
         'charter_doc_id': charter_id,
         'prd_doc_id': prd_id,
-        'sdd_doc_id': sdd_id,
         'backlog_sheet_id': backlog_sid,
     }
 
@@ -241,7 +248,7 @@ def scaffold_local_project(cfg: dict, slug: str, display_name: str, purpose: str
 
 
 def append_drive(document_id: str, text: str) -> None:
-    doc = jx(run("gws docs documents get --params " + shlex.quote(json.dumps({"documentId": document_id}))))
+    doc = jx(run_gws(['docs','documents','get','--params', json.dumps({'documentId': document_id})]))
     end = 1
     try:
         end = int(doc["body"]["content"][-1]["endIndex"])
@@ -249,12 +256,7 @@ def append_drive(document_id: str, text: str) -> None:
         end = 1
     insert_at = max(1, end - 1)
     req = [{"insertText": {"location": {"index": insert_at}, "text": text}}]
-    run(
-        "gws docs documents batchUpdate --params "
-        + shlex.quote(json.dumps({"documentId": document_id}))
-        + " --json "
-        + shlex.quote(json.dumps({"requests": req}))
-    )
+    run_gws(['docs','documents','batchUpdate','--params', json.dumps({'documentId': document_id}), '--json', json.dumps({'requests': req})])
 
 
 def init_drive_docs(cfg: dict) -> dict:

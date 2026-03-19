@@ -1,6 +1,14 @@
 ---
 name: project-memory-ledger
-description: "Engineering project memory ledger with evidence + rollback (Invariants, Decision Log, Change Log). Use to extend conversations over time, reduce hallucinations, avoid memory pollution, and keep systems stable by recording project rules/decisions/changes with traceability. Supports Drive (Google Docs via gws) and local-only mode (markdown) via config; defaults to project-memory-ledger when no Project is specified."
+description: "Engineering project memory ledger with evidence + rollback (Invariants, Decision Log, Change Log). Use to extend conversations over time, reduce hallucinations, avoid memory pollution, and keep systems stable by recording project rules/decisions/changes with traceability. Supports local-only mode (Markdown) and optional Drive project-doc scaffolding via gws; defaults to project-memory-ledger when no Project is specified."
+metadata:
+  openclaw:
+    requires:
+      bins:
+        - python3
+    recommends:
+      bins:
+        - gws
 ---
 
 # Project Memory Ledger
