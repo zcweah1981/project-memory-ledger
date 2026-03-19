@@ -103,11 +103,12 @@ def ensure_local_files(cfg: dict) -> dict:
 
 
 def local_path(cfg: dict, doc_key: str) -> Path:
-    # Single-ledger but split into 3 files.
+    # Single-ledger but split into multiple files.
     name = {
         "invariants": "INVARIANTS.md",
         "decisions": "DECISIONS.md",
         "changes": "CHANGES.md",
+        "projects": "PROJECTS.md",
     }[doc_key]
     return Path(cfg["local_dir"]) / name
 
@@ -150,6 +151,59 @@ def move_to_folder(file_id: str, folder_id: str) -> None:
     if parents:
         upd["removeParents"] = ",".join(parents)
     run("gws drive files update --params " + shlex.quote(json.dumps(upd)) + " --json {}")
+
+
+def ensure_drive_folder(parent_id: str, name: str) -> str:
+    q = f"'{parent_id}' in parents and name='{name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+    params = json.dumps({"q": q, "pageSize": 5, "fields": "files(id,name)"})
+    out = run("gws drive files list --params " + shlex.quote(params))
+    files = jx(out).get('files', [])
+    if files:
+        return files[0]['id']
+    body = json.dumps({"name": name, "mimeType": "application/vnd.google-apps.folder", "parents": [parent_id]})
+    out = run("gws drive files create --json " + shlex.quote(body))
+    return jx(out)['id']
+
+
+def create_gdoc_in_folder(folder_id: str, title: str, initial_text: str = "") -> str:
+    out = run("gws docs documents create --json " + shlex.quote(json.dumps({"title": title})))
+    doc_id = jx(out)['documentId']
+    move_to_folder(doc_id, folder_id)
+    if initial_text:
+        append_drive(doc_id, initial_text)
+    return doc_id
+
+
+def create_gsheet_in_folder(folder_id: str, title: str) -> str:
+    out = run("gws sheets spreadsheets create --json " + shlex.quote(json.dumps({"properties": {"title": title}})))
+    sid = jx(out)['spreadsheetId']
+    move_to_folder(sid, folder_id)
+    return sid
+
+
+def scaffold_drive_project(cfg: dict, slug: str, display_name: str, purpose: str) -> dict:
+    # Create Drive folder structure under projects_root_folder_id (default: My Drive root)
+    root_parent = cfg.get('projects_root_folder_id') or '0APMZTB1iZ6Q9Uk9PVA'
+    project_folder_id = ensure_drive_folder(root_parent, display_name)
+
+    subfolders = {}
+    for name in ['Docs','Specs','Data','Backlog','Evidence','Releases','Archive']:
+        subfolders[name] = ensure_drive_folder(project_folder_id, name)
+
+    # Create starter docs
+    charter_id = create_gdoc_in_folder(subfolders['Docs'], 'Project Charter', f"\n# Project Charter\n- Name: {display_name}\n- Slug: {slug}\n- Purpose: {purpose}\n")
+    prd_id = create_gdoc_in_folder(subfolders['Docs'], 'PRD')
+    sdd_id = create_gdoc_in_folder(subfolders['Docs'], 'SDD')
+    backlog_sid = create_gsheet_in_folder(subfolders['Backlog'], 'Backlog')
+
+    return {
+        'project_folder_id': project_folder_id,
+        'docs_folder_id': subfolders['Docs'],
+        'charter_doc_id': charter_id,
+        'prd_doc_id': prd_id,
+        'sdd_doc_id': sdd_id,
+        'backlog_sheet_id': backlog_sid,
+    }
 
 
 def append_drive(document_id: str, text: str) -> None:
@@ -228,6 +282,7 @@ def main():
     ap_reg.add_argument("--purpose", required=True, help="Why this project exists / success criteria")
     ap_reg.add_argument("--interfaces", required=False, help="Optional: A ↔ B")
     ap_reg.add_argument("--notes", required=False, default="")
+    ap_reg.add_argument("--scaffold", required=False, default="auto", choices=["auto","off"], help="auto: create Drive project folder structure (drive/both). off: only register entry.")
 
     args = ap.parse_args()
 
@@ -303,8 +358,32 @@ def main():
             + "- **Status**: CONFIRMED\n"
         )
 
+        scaffold_info = {}
+        if backend in ("drive", "both") and args.scaffold == 'auto':
+            scaffold_info = scaffold_drive_project(cfg, slug, args.name, args.purpose)
+
+        # append scaffold links into registry entry (local)
+        if scaffold_info and backend in ("local", "both"):
+            entry_text += (
+                f"- **Drive Folder**: https://drive.google.com/drive/folders/{scaffold_info['project_folder_id']}\n"
+                f"- **Charter**: https://docs.google.com/document/d/{scaffold_info['charter_doc_id']}/edit\n"
+                f"- **PRD**: https://docs.google.com/document/d/{scaffold_info['prd_doc_id']}/edit\n"
+                f"- **SDD**: https://docs.google.com/document/d/{scaffold_info['sdd_doc_id']}/edit\n"
+                f"- **Backlog Sheet**: https://docs.google.com/spreadsheets/d/{scaffold_info['backlog_sheet_id']}/edit\n"
+            )
+            append_local(cfg, 'projects', entry_text)
+
         if backend in ("drive", "both"):
             doc_id = cfg['docs']['decision_log_doc_id']
+            # add scaffold links to decision entry
+            if scaffold_info:
+                decision_text += (
+                    f"- **Drive Folder**: https://drive.google.com/drive/folders/{scaffold_info['project_folder_id']}\n"
+                    f"- **Charter**: https://docs.google.com/document/d/{scaffold_info['charter_doc_id']}/edit\n"
+                    f"- **PRD**: https://docs.google.com/document/d/{scaffold_info['prd_doc_id']}/edit\n"
+                    f"- **SDD**: https://docs.google.com/document/d/{scaffold_info['sdd_doc_id']}/edit\n"
+                    f"- **Backlog Sheet**: https://docs.google.com/spreadsheets/d/{scaffold_info['backlog_sheet_id']}/edit\n"
+                )
             append_drive(doc_id, decision_text)
             print(doc_id)
         else:
