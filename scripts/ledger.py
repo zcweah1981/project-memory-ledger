@@ -409,9 +409,8 @@ def main():
             entry_lines.append(f"- **Notes**: {args.notes}")
         entry_text = "\n".join(entry_lines) + "\n"
 
-        # Local registry
-        if backend in ("local", "both"):
-            append_local(cfg, 'projects', entry_text)
+        # Local registry (always)
+        append_local(cfg, 'projects', entry_text)
 
         # Also record as a decision (for auditability)
         decision_text = (
