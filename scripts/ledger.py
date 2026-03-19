@@ -343,10 +343,8 @@ def main():
             f"- **Proposed edits**:\n  - ...\n"
         )
 
-        if backend in ('local','both'):
-            append_local(cfg, 'prd_patches', proposal)
-
-        # In drive/both, we do not auto-apply; we just print the proposal path/doc and rely on manual apply.
+        # Proposals are part of the ledger => always local
+        append_local(cfg, 'prd_patches', proposal)
         print(proposal.strip())
         return
 
@@ -388,8 +386,8 @@ def main():
         if backend in ("drive", "both") and args.scaffold == 'auto':
             scaffold_info = scaffold_drive_project(cfg, slug, args.name, args.purpose)
 
-        # append scaffold links into registry entry (local)
-        if scaffold_info and backend in ("local", "both"):
+        # Append scaffold links into local registry entry
+        if scaffold_info:
             entry_text += (
                 f"- **Drive Folder**: https://drive.google.com/drive/folders/{scaffold_info['project_folder_id']}\n"
                 f"- **Charter**: https://docs.google.com/document/d/{scaffold_info['charter_doc_id']}/edit\n"
@@ -399,21 +397,7 @@ def main():
             )
             append_local(cfg, 'projects', entry_text)
 
-        if backend in ("drive", "both"):
-            doc_id = cfg['docs']['decision_log_doc_id']
-            # add scaffold links to decision entry
-            if scaffold_info:
-                decision_text += (
-                    f"- **Drive Folder**: https://drive.google.com/drive/folders/{scaffold_info['project_folder_id']}\n"
-                    f"- **Charter**: https://docs.google.com/document/d/{scaffold_info['charter_doc_id']}/edit\n"
-                    f"- **PRD**: https://docs.google.com/document/d/{scaffold_info['prd_doc_id']}/edit\n"
-                    f"- **SDD**: https://docs.google.com/document/d/{scaffold_info['sdd_doc_id']}/edit\n"
-                    f"- **Backlog Sheet**: https://docs.google.com/spreadsheets/d/{scaffold_info['backlog_sheet_id']}/edit\n"
-                )
-            append_drive(doc_id, decision_text)
-            print(doc_id)
-        else:
-            print(str(local_path(cfg, 'projects')))
+        print(str(local_path(cfg, 'projects')))
         return
 
 

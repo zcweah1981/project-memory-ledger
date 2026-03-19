@@ -10,10 +10,14 @@ Maintain a durable, low-pollution ledger split into **three books**:
 - **Decisions**: tradeoffs and rationale
 - **Changes**: what changed + why + evidence + impact + rollback
 
-Backends (configurable):
-- **local**: write markdown only (always works) — **recommended default**
-- **drive**: write Google Docs in Drive (optional; requires Drive backend)
-- **both**: dual-write (only if you really need Drive collaboration; otherwise use local + agent-generated summaries)
+Backends (configurable) — **new semantics**:
+- The **ledger is always local Markdown**.
+- `backend` only controls whether the skill also creates/stores **project docs** (PRD/SDD/Backlog/etc.) in Drive.
+
+Values:
+- **local**: ledger only; do not touch Drive
+- **drive**: ledger local + scaffold project docs in Drive
+- **both**: same as drive (ledger local; Drive for docs/assets)
 
 ## Key conventions (write these into entries)
 ### Project tagging (normalized, case-insensitive)
