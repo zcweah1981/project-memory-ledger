@@ -196,10 +196,10 @@ def scaffold_drive_project(cfg: dict, slug: str, display_name: str, purpose: str
         subfolders[name] = ensure_drive_folder(project_folder_id, name)
 
     # Create starter docs
-    charter_id = create_gdoc_in_folder(subfolders['Docs'], 'Project Charter', f"\n# Project Charter\n- Name: {display_name}\n- Slug: {slug}\n- Purpose: {purpose}\n")
-    prd_id = create_gdoc_in_folder(subfolders['Docs'], 'PRD')
-    sdd_id = create_gdoc_in_folder(subfolders['Docs'], 'SDD')
-    backlog_sid = create_gsheet_in_folder(subfolders['Backlog'], 'Backlog')
+    charter_id = create_gdoc_in_folder(subfolders['Docs'], '项目说明（Charter）', f"\n# 项目说明（Project Charter）\n- 项目名: {display_name}\n- Slug: {slug}\n- 目的: {purpose}\n")
+    prd_id = create_gdoc_in_folder(subfolders['Docs'], 'PRD（需求文档）')
+    # SDD is optional; create only if the user asks later
+    backlog_sid = create_gsheet_in_folder(subfolders['Backlog'], 'Backlog（待办）')
 
     return {
         'backend': 'drive',
@@ -221,24 +221,21 @@ def scaffold_local_project(cfg: dict, slug: str, display_name: str, purpose: str
         sub[name] = p
 
     # starter markdown docs
-    charter = sub['Docs'] / 'Project Charter.md'
-    prd = sub['Docs'] / 'PRD.md'
-    sdd = sub['Docs'] / 'SDD.md'
-    backlog = sub['Backlog'] / 'Backlog.md'
+    charter = sub['Docs'] / '项目说明（Charter）.md'
+    prd = sub['Docs'] / 'PRD（需求文档）.md'
+    backlog = sub['Backlog'] / 'Backlog（待办）.md'
 
     if not charter.exists():
-        charter.write_text(f"# Project Charter\n\n- Name: {display_name}\n- Slug: {slug}\n- Purpose: {purpose}\n", encoding='utf-8')
+        charter.write_text(f"# 项目说明（Project Charter）\n\n- 项目名: {display_name}\n- Slug: {slug}\n- 目的: {purpose}\n", encoding='utf-8')
     prd.touch(exist_ok=True)
-    sdd.touch(exist_ok=True)
     if not backlog.exists():
-        backlog.write_text("# Backlog\n\n- [ ] P0: ...\n", encoding='utf-8')
+        backlog.write_text("# Backlog（待办）\n\n- [ ] P0: ...\n", encoding='utf-8')
 
     return {
         'backend': 'local',
         'project_dir': str(project_dir),
         'charter_path': str(charter),
         'prd_path': str(prd),
-        'sdd_path': str(sdd),
         'backlog_path': str(backlog),
     }
 
