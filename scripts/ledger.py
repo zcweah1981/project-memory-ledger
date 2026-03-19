@@ -1,31 +1,36 @@
 #!/usr/bin/env python3
 """Project Memory Ledger.
 
-Backends:
-- drive: append to Drive GDocs (requires gws auth)
-- local: append to local markdown files (no Drive IDs)
-- both: do both
+Backend semantics (simplified):
+- The **ledger is always written to local Markdown**.
+- `backend` only decides where **project docs/assets** live when scaffolding a project:
+  - local: local project directory + Markdown docs
+  - drive: Drive folder structure + GDoc/GSheet (requires gws auth)
 
 Config JSON (recommended path): /root/.openclaw/workspace-nero/config/project_memory_ledger.json
 {
   "language": "zh",
-  "backend": "drive" | "local" | "both",
-  "shared_folder_id": "<drive folder id>" ,          # drive/both
+  "backend": "local" | "drive",
+  "default_project": "project-memory-ledger",
   "local_dir": "/root/.openclaw/workspace-nero/ledgers",
-  "docs": {"invariants_doc_id":"","decision_log_doc_id":"","change_log_doc_id":""},
-  "doc_titles": {...}
+
+  "projects_root_dir": "/root/.openclaw/workspace-nero/projects",  # local backend
+
+  "projects_root_folder_id": "0APMZTB1iZ6Q9Uk9PVA",                 # drive backend (My Drive root)
+  "shared_folder_id": "<Drive folder id for Shared/>"               # optional / legacy
 }
 
 Commands:
   ledger.py init --config <path>
   ledger.py append --config <path> --doc <invariants|decisions|changes> --text <text> [--project <nameOrSlug>]
+  ledger.py register-project --config <path> --name <display name> [--slug <slug>] --purpose <text> [--interfaces <a↔b>] [--notes <text>] [--scaffold <auto|off>]
+  ledger.py update-prd --config <path> --project <nameOrSlug> [--mode propose|apply]
 
 Project normalization:
 - Input is case-insensitive.
-- We normalize to slugs:
+- We normalize to slugs (examples):
   - "Hunter System" → hunter-system
   - "Keyword Engine" → keyword-engine
-  - otherwise: lowercase + spaces/underscores → hyphens; strip non [a-z0-9-]
 """
 
 import argparse
@@ -197,12 +202,44 @@ def scaffold_drive_project(cfg: dict, slug: str, display_name: str, purpose: str
     backlog_sid = create_gsheet_in_folder(subfolders['Backlog'], 'Backlog')
 
     return {
+        'backend': 'drive',
         'project_folder_id': project_folder_id,
-        'docs_folder_id': subfolders['Docs'],
         'charter_doc_id': charter_id,
         'prd_doc_id': prd_id,
         'sdd_doc_id': sdd_id,
         'backlog_sheet_id': backlog_sid,
+    }
+
+
+def scaffold_local_project(cfg: dict, slug: str, display_name: str, purpose: str) -> dict:
+    root = Path(cfg.get('projects_root_dir') or '/root/.openclaw/workspace-nero/projects')
+    project_dir = root / display_name
+    sub = {}
+    for name in ['Docs','Specs','Data','Backlog','Evidence','Releases','Archive']:
+        p = project_dir / name
+        p.mkdir(parents=True, exist_ok=True)
+        sub[name] = p
+
+    # starter markdown docs
+    charter = sub['Docs'] / 'Project Charter.md'
+    prd = sub['Docs'] / 'PRD.md'
+    sdd = sub['Docs'] / 'SDD.md'
+    backlog = sub['Backlog'] / 'Backlog.md'
+
+    if not charter.exists():
+        charter.write_text(f"# Project Charter\n\n- Name: {display_name}\n- Slug: {slug}\n- Purpose: {purpose}\n", encoding='utf-8')
+    prd.touch(exist_ok=True)
+    sdd.touch(exist_ok=True)
+    if not backlog.exists():
+        backlog.write_text("# Backlog\n\n- [ ] P0: ...\n", encoding='utf-8')
+
+    return {
+        'backend': 'local',
+        'project_dir': str(project_dir),
+        'charter_path': str(charter),
+        'prd_path': str(prd),
+        'sdd_path': str(sdd),
+        'backlog_path': str(backlog),
     }
 
 
@@ -251,12 +288,15 @@ def init_drive_docs(cfg: dict) -> dict:
 
 def init(cfg_path: str) -> dict:
     cfg = load_config(cfg_path)
-    backend = (cfg.get("backend") or "drive").lower()
+    backend = (cfg.get("backend") or "local").lower()
+    if backend not in ("local", "drive"):
+        backend = "local"
     cfg["backend"] = backend
-    cfg = ensure_local_files(cfg)
 
-    if backend in ("drive", "both"):
-        cfg = init_drive_docs(cfg)
+    # Ledger is always local
+    cfg = ensure_local_files(cfg)
+    cfg.setdefault('projects_root_dir', '/root/.openclaw/workspace-nero/projects')
+    cfg.setdefault('projects_root_folder_id', '0APMZTB1iZ6Q9Uk9PVA')
 
     save_config(cfg_path, cfg)
     return cfg
@@ -282,7 +322,7 @@ def main():
     ap_reg.add_argument("--purpose", required=True, help="Why this project exists / success criteria")
     ap_reg.add_argument("--interfaces", required=False, help="Optional: A ↔ B")
     ap_reg.add_argument("--notes", required=False, default="")
-    ap_reg.add_argument("--scaffold", required=False, default="auto", choices=["auto","off"], help="auto: create Drive project folder structure (drive/both). off: only register entry.")
+    ap_reg.add_argument("--scaffold", required=False, default="auto", choices=["auto","off"], help="auto: create project scaffold based on backend; off: only register entry.")
 
     args = ap.parse_args()
 
@@ -383,18 +423,30 @@ def main():
         )
 
         scaffold_info = {}
-        if backend in ("drive", "both") and args.scaffold == 'auto':
-            scaffold_info = scaffold_drive_project(cfg, slug, args.name, args.purpose)
+        if args.scaffold == 'auto':
+            if backend == 'drive':
+                scaffold_info = scaffold_drive_project(cfg, slug, args.name, args.purpose)
+            else:
+                scaffold_info = scaffold_local_project(cfg, slug, args.name, args.purpose)
 
-        # Append scaffold links into local registry entry
+        # Append scaffold pointers into local registry entry
         if scaffold_info:
-            entry_text += (
-                f"- **Drive Folder**: https://drive.google.com/drive/folders/{scaffold_info['project_folder_id']}\n"
-                f"- **Charter**: https://docs.google.com/document/d/{scaffold_info['charter_doc_id']}/edit\n"
-                f"- **PRD**: https://docs.google.com/document/d/{scaffold_info['prd_doc_id']}/edit\n"
-                f"- **SDD**: https://docs.google.com/document/d/{scaffold_info['sdd_doc_id']}/edit\n"
-                f"- **Backlog Sheet**: https://docs.google.com/spreadsheets/d/{scaffold_info['backlog_sheet_id']}/edit\n"
-            )
+            if scaffold_info.get('backend') == 'drive':
+                entry_text += (
+                    f"- **Drive Folder**: https://drive.google.com/drive/folders/{scaffold_info['project_folder_id']}\n"
+                    f"- **Charter**: https://docs.google.com/document/d/{scaffold_info['charter_doc_id']}/edit\n"
+                    f"- **PRD**: https://docs.google.com/document/d/{scaffold_info['prd_doc_id']}/edit\n"
+                    f"- **SDD**: https://docs.google.com/document/d/{scaffold_info['sdd_doc_id']}/edit\n"
+                    f"- **Backlog Sheet**: https://docs.google.com/spreadsheets/d/{scaffold_info['backlog_sheet_id']}/edit\n"
+                )
+            else:
+                entry_text += (
+                    f"- **Local Project Dir**: {scaffold_info['project_dir']}\n"
+                    f"- **Charter**: {scaffold_info['charter_path']}\n"
+                    f"- **PRD**: {scaffold_info['prd_path']}\n"
+                    f"- **SDD**: {scaffold_info['sdd_path']}\n"
+                    f"- **Backlog**: {scaffold_info['backlog_path']}\n"
+                )
             append_local(cfg, 'projects', entry_text)
 
         print(str(local_path(cfg, 'projects')))

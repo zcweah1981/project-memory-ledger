@@ -10,14 +10,13 @@ Maintain a durable, low-pollution ledger split into **three books**:
 - **Decisions**: tradeoffs and rationale
 - **Changes**: what changed + why + evidence + impact + rollback
 
-Backends (configurable) — **new semantics**:
+Backends (configurable) — **simplified semantics**:
 - The **ledger is always local Markdown**.
-- `backend` only controls whether the skill also creates/stores **project docs** (PRD/SDD/Backlog/etc.) in Drive.
+- `backend` only controls where the **project docs/assets** are scaffolded and stored.
 
 Values:
-- **local**: ledger only; do not touch Drive
-- **drive**: ledger local + scaffold project docs in Drive
-- **both**: same as drive (ledger local; Drive for docs/assets)
+- **local**: create project directory structure locally and store docs as Markdown
+- **drive**: create Drive folder structure and store docs as GDoc/GSheet (requires gws auth)
 
 ## Key conventions (write these into entries)
 ### Project tagging (normalized, case-insensitive)
@@ -37,7 +36,7 @@ Config path (recommended):
 - `/root/.openclaw/workspace-nero/config/project_memory_ledger.json`
 
 Minimal fields:
-- `backend`: `local` | `drive` | `both`
+- `backend`: `local` | `drive`
 - `default_project`: `project-memory-ledger`
 - `local_dir`: `/root/.openclaw/workspace-nero/ledgers`
 

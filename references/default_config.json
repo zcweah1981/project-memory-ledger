@@ -1,9 +1,10 @@
 {
   "language": "zh",
-  "backend": "drive",
+  "backend": "local",
   "default_project": "project-memory-ledger",
   "shared_folder_id": "1h0lh5kim0Zi3IFS257lxpc_n1r6JXb-G",
   "projects_root_folder_id": "0APMZTB1iZ6Q9Uk9PVA",
+  "projects_root_dir": "/root/.openclaw/workspace-nero/projects",
   "local_dir": "/root/.openclaw/workspace-nero/ledgers",
   "docs": {
     "invariants_doc_id": "",
