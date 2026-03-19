@@ -7,17 +7,21 @@ Backend semantics (simplified):
   - local: local project directory + Markdown docs
   - drive: Drive folder structure + GDoc/GSheet (requires gws auth)
 
-Config JSON (recommended path): /root/.openclaw/workspace-nero/config/project_memory_ledger.json
+Config JSON (recommended path): <workspace>/config/project_memory_ledger.json
 {
-  "language": "zh",
+  "language": "zh" | "en",
   "backend": "local" | "drive",
   "default_project": "project-memory-ledger",
-  "local_dir": "/root/.openclaw/workspace-nero/ledgers",
 
-  "projects_root_dir": "/root/.openclaw/workspace-nero/projects",  # local backend
+  // local backend
+  "local_dir": "./ledgers",
+  "projects_root_dir": "./projects",
 
-  "projects_root_folder_id": "0APMZTB1iZ6Q9Uk9PVA",                 # drive backend (My Drive root)
-  "shared_folder_id": "<Drive folder id for Shared/>"               # optional / legacy
+  // drive backend (required when backend=drive)
+  "projects_root_folder_id": "<Drive folder id where projects are created>",
+
+  // optional / legacy
+  "shared_folder_id": "<Drive folder id for Shared/>"
 }
 
 Commands:
@@ -114,7 +118,7 @@ def save_config(path: str, cfg: dict) -> None:
 
 
 def ensure_local_files(cfg: dict) -> dict:
-    local_dir = cfg.get("local_dir") or "/root/.openclaw/workspace-nero/ledgers"
+    local_dir = cfg.get("local_dir") or "./ledgers"
     Path(local_dir).mkdir(parents=True, exist_ok=True)
     cfg["local_dir"] = local_dir
     return cfg
@@ -196,7 +200,9 @@ def create_gsheet_in_folder(folder_id: str, title: str) -> str:
 
 def scaffold_drive_project(cfg: dict, slug: str, display_name: str, purpose: str) -> dict:
     # Create Drive folder structure under projects_root_folder_id (default: My Drive root)
-    root_parent = cfg.get('projects_root_folder_id') or '0APMZTB1iZ6Q9Uk9PVA'
+    root_parent = cfg.get('projects_root_folder_id')
+    if not root_parent:
+        raise SystemExit("projects_root_folder_id missing (set it to a Drive folder id where projects should be created)")
     project_folder_id = ensure_drive_folder(root_parent, display_name)
 
     subfolders = {}
@@ -219,7 +225,7 @@ def scaffold_drive_project(cfg: dict, slug: str, display_name: str, purpose: str
 
 
 def scaffold_local_project(cfg: dict, slug: str, display_name: str, purpose: str) -> dict:
-    root = Path(cfg.get('projects_root_dir') or '/root/.openclaw/workspace-nero/projects')
+    root = Path(cfg.get('projects_root_dir') or './projects')
     project_dir = root / display_name
     sub = {}
     for name in ['Docs','Specs','Data','Backlog','Evidence','Releases','Archive']:
@@ -300,8 +306,7 @@ def init(cfg_path: str) -> dict:
 
     # Ledger is always local
     cfg = ensure_local_files(cfg)
-    cfg.setdefault('projects_root_dir', '/root/.openclaw/workspace-nero/projects')
-    cfg.setdefault('projects_root_folder_id', '0APMZTB1iZ6Q9Uk9PVA')
+    cfg.setdefault('projects_root_dir', './projects')
 
     save_config(cfg_path, cfg)
     return cfg
