@@ -356,22 +356,9 @@ def main():
             project_slug = normalize_project(cfg.get('default_project')) or 'project-memory-ledger'
         text = inject_project(args.text, project_slug)
 
-        if backend in ("local", "both"):
-            append_local(cfg, args.doc, text)
-
-        if backend in ("drive", "both"):
-            doc_map = {
-                "invariants": cfg["docs"]["invariants_doc_id"],
-                "decisions": cfg["docs"]["decision_log_doc_id"],
-                "changes": cfg["docs"]["change_log_doc_id"],
-            }
-            doc_id = doc_map[args.doc]
-            if not doc_id:
-                raise SystemExit(f"Drive doc id missing for {args.doc}")
-            append_drive(doc_id, text)
-            print(doc_id)
-        else:
-            print(str(local_path(cfg, args.doc)))
+        # Ledger is always local Markdown (single source of truth)
+        append_local(cfg, args.doc, text)
+        print(str(local_path(cfg, args.doc)))
         return
 
     if args.cmd == "update-prd":
