@@ -28,6 +28,27 @@ The ledger is always written to local Markdown files:
 ### 0) Choose a workspace
 “workspace” means your OpenClaw working directory (not necessarily `workspace-nero`).
 
+### 1) Use the ledger skill (write)
+Configure and write L1 ledgers with **project-memory-ledger**.
+
+### 2) Use the index skill (retrieve)
+Build/query the L2 index with **longterm-memory-index**.
+
+Example:
+```bash
+python3 longterm-memory-index/scripts/index_build.py \
+  --workspace <workspace> \
+  --db <workspace>/data/ledger_index.sqlite
+
+python3 longterm-memory-index/scripts/index_query.py \
+  --db <workspace>/data/ledger_index.sqlite \
+  --q "keyword engine" \
+  --limit 5
+```
+
+### 0) Choose a workspace
+“workspace” means your OpenClaw working directory (not necessarily `workspace-nero`).
+
 ### 1) Create config
 Recommended path:
 - `<workspace>/config/project_memory_ledger.json`
@@ -119,6 +140,10 @@ If you omit `--project`, the script injects:
 Drive mode is optional and pluggable:
 - Option 1 (v1 implemented): `gws` CLI (installed + authenticated)
 - Option 2: Google API / service account
+- Option 3: third-party Drive tooling
+
+If Drive isn’t available, use `backend=local`.
+/ service account
 - Option 3: third-party Drive tooling
 
 If Drive isn’t available, use `backend=local`.

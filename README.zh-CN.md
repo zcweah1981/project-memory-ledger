@@ -6,6 +6,27 @@
 
 ## 它做什么
 
+### A）总账（L1）— 永远写本地 Markdown
+- 单一真相源：
+  - `<workspace>/ledgers/INVARIANTS.md`
+  - `<workspace>/ledgers/DECISIONS.md`
+  - `<workspace>/ledgers/CHANGES.md`
+  - `<workspace>/ledgers/PROJECTS.md`
+
+### B）索引 + 驾驶舱（L2 + L0）
+- 生成可检索索引：
+  - `<workspace>/data/ledger_index.sqlite`
+- 不加载整本总账也能检索（低 token）
+- 为每个项目生成 ≤30 行的 Control Panel，并发布到 Drive 的 Specs 文档中
+
+---
+
+## 仓库结构
+- `scripts/ledger.py` + `references/` → **project-memory-ledger** skill
+- `longterm-memory-index/` → **longterm-memory-index** skill
+
+> 如果你用 ClawHub 从 GitHub 导入，请把每个目录当作独立 skill 发布。
+
 ### 1）本地总账（永远写本地 Markdown）
 总账一律写入本地 Markdown 文件：
 - `<workspace>/ledgers/INVARIANTS.md`
