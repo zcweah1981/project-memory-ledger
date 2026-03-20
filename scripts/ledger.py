@@ -45,6 +45,7 @@ import shlex
 import subprocess
 import sys
 import shutil
+import sqlite3
 from pathlib import Path
 from datetime import datetime
 
@@ -122,6 +123,108 @@ def ensure_local_files(cfg: dict) -> dict:
     Path(local_dir).mkdir(parents=True, exist_ok=True)
     cfg["local_dir"] = local_dir
     return cfg
+
+
+def workspace_root_from_config_path(cfg_path: str) -> Path:
+    """Infer <workspace> from <workspace>/config/*.json."""
+    p = Path(cfg_path).resolve()
+    if p.parent.name == 'config':
+        return p.parent.parent
+    return p.parent
+
+
+def ledger_index_db_path(cfg_path: str) -> Path:
+    ws = workspace_root_from_config_path(cfg_path)
+    return ws / 'data' / 'ledger_index.sqlite'
+
+
+def ensure_projects_registry(db_path: Path) -> None:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(str(db_path))
+    con.execute("PRAGMA journal_mode=WAL;")
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS projects_registry (
+          slug TEXT PRIMARY KEY,
+          display_name TEXT,
+          drive_root_folder_id TEXT,
+          docs_folder_id TEXT,
+          specs_folder_id TEXT,
+          spec_gdoc_id TEXT,
+          control_panel_gdoc_id TEXT,
+          updated_at TEXT
+        )
+        """
+    )
+    con.commit()
+    con.close()
+
+
+def registry_upsert(db_path: Path, slug: str, **fields) -> None:
+    ensure_projects_registry(db_path)
+    con = sqlite3.connect(str(db_path))
+    con.execute(
+        """
+        INSERT INTO projects_registry(
+          slug, display_name, drive_root_folder_id, docs_folder_id, specs_folder_id,
+          spec_gdoc_id, control_panel_gdoc_id, updated_at
+        ) VALUES (?,?,?,?,?,?,?,?)
+        ON CONFLICT(slug) DO UPDATE SET
+          display_name=COALESCE(excluded.display_name, projects_registry.display_name),
+          drive_root_folder_id=COALESCE(excluded.drive_root_folder_id, projects_registry.drive_root_folder_id),
+          docs_folder_id=COALESCE(excluded.docs_folder_id, projects_registry.docs_folder_id),
+          specs_folder_id=COALESCE(excluded.specs_folder_id, projects_registry.specs_folder_id),
+          spec_gdoc_id=COALESCE(excluded.spec_gdoc_id, projects_registry.spec_gdoc_id),
+          control_panel_gdoc_id=COALESCE(excluded.control_panel_gdoc_id, projects_registry.control_panel_gdoc_id),
+          updated_at=excluded.updated_at
+        """,
+        (
+            slug,
+            fields.get('display_name'),
+            fields.get('drive_root_folder_id'),
+            fields.get('docs_folder_id'),
+            fields.get('specs_folder_id'),
+            fields.get('spec_gdoc_id'),
+            fields.get('control_panel_gdoc_id'),
+            datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+        ),
+    )
+    con.commit()
+    con.close()
+
+
+def registry_get(db_path: Path, slug: str) -> dict | None:
+    ensure_projects_registry(db_path)
+    con = sqlite3.connect(str(db_path))
+    con.row_factory = sqlite3.Row
+    row = con.execute("SELECT * FROM projects_registry WHERE slug=?", (slug,)).fetchone()
+    con.close()
+    return dict(row) if row else None
+
+
+def index_latest_items(db_path: Path, slug: str, typ: str, limit: int = 5) -> list[dict]:
+    con = sqlite3.connect(str(db_path))
+    con.row_factory = sqlite3.Row
+    rows = con.execute(
+        """
+        SELECT project, type, date, summary, tags_json, source_path, source_line
+        FROM ledger_items
+        WHERE project=? AND type=?
+        ORDER BY date DESC, id DESC
+        LIMIT ?
+        """,
+        (slug, typ, int(limit)),
+    ).fetchall()
+    con.close()
+    out = []
+    for r in rows:
+        out.append({
+            'date': r['date'],
+            'summary': r['summary'],
+            'tags': json.loads(r['tags_json'] or '[]'),
+            'source': f"{r['source_path']}:{r['source_line']}",
+        })
+    return out
 
 
 def local_path(cfg: dict, doc_key: str) -> Path:
@@ -334,6 +437,21 @@ def main():
     ap_reg.add_argument("--notes", required=False, default="")
     ap_reg.add_argument("--scaffold", required=False, default="auto", choices=["auto","off"], help="auto: create project scaffold based on backend; off: only register entry.")
 
+    ap_reg2 = sub.add_parser("registry-upsert")
+    ap_reg2.add_argument("--config", required=True)
+    ap_reg2.add_argument("--slug", required=True)
+    ap_reg2.add_argument("--display-name", required=False, default="")
+    ap_reg2.add_argument("--drive-root-folder-id", required=False, default="")
+    ap_reg2.add_argument("--docs-folder-id", required=False, default="")
+    ap_reg2.add_argument("--specs-folder-id", required=False, default="")
+    ap_reg2.add_argument("--spec-gdoc-id", required=False, default="")
+    ap_reg2.add_argument("--control-panel-gdoc-id", required=False, default="")
+
+    ap_boot = sub.add_parser("bootstrap")
+    ap_boot.add_argument("--config", required=True)
+    ap_boot.add_argument("--project", required=True, help="Project slug/name")
+    ap_boot.add_argument("--limit", type=int, default=5)
+
     args = ap.parse_args()
 
     if args.cmd == "init":
@@ -434,6 +552,20 @@ def main():
                     f"- **PRD**: https://docs.google.com/document/d/{scaffold_info['prd_doc_id']}/edit\n"
                     f"- **Backlog Sheet**: https://docs.google.com/spreadsheets/d/{scaffold_info['backlog_sheet_id']}/edit\n"
                 )
+
+                # Upsert registry for fast bootstrap on restart
+                # Note: v1 stores only the root folder + PRD as spec (until a dedicated Spec doc exists).
+                dbp = ledger_index_db_path(args.config)
+                registry_upsert(
+                    dbp,
+                    slug,
+                    display_name=args.name,
+                    drive_root_folder_id=scaffold_info.get('project_folder_id'),
+                    docs_folder_id=None,
+                    specs_folder_id=None,
+                    spec_gdoc_id=scaffold_info.get('prd_doc_id'),
+                    control_panel_gdoc_id=None,
+                )
             else:
                 entry_text += (
                     f"- **Local Project Dir**: {scaffold_info['project_dir']}\n"
@@ -444,6 +576,74 @@ def main():
             append_local(cfg, 'projects', entry_text)
 
         print(str(local_path(cfg, 'projects')))
+        return
+
+    if args.cmd == "registry-upsert":
+        cfg = init(args.config)
+        slug = normalize_project(args.slug) or args.slug
+        dbp = ledger_index_db_path(args.config)
+        registry_upsert(
+            dbp,
+            slug,
+            display_name=(args.display_name or None),
+            drive_root_folder_id=(args.drive_root_folder_id or None),
+            docs_folder_id=(args.docs_folder_id or None),
+            specs_folder_id=(args.specs_folder_id or None),
+            spec_gdoc_id=(args.spec_gdoc_id or None),
+            control_panel_gdoc_id=(args.control_panel_gdoc_id or None),
+        )
+        print(json.dumps({'ok': True, 'db': str(dbp), 'slug': slug}, ensure_ascii=False))
+        return
+
+    if args.cmd == "bootstrap":
+        cfg = init(args.config)
+        slug = normalize_project(args.project) or args.project
+        dbp = ledger_index_db_path(args.config)
+
+        reg = registry_get(dbp, slug) or {}
+
+        decisions = []
+        changes = []
+        try:
+            decisions = index_latest_items(dbp, slug, 'decision', args.limit)
+            changes = index_latest_items(dbp, slug, 'change', args.limit)
+        except Exception:
+            decisions = []
+            changes = []
+
+        lines = []
+        lines.append(f"# Control Panel — {slug}")
+        lines.append(f"Updated: {datetime.utcnow().strftime('%Y-%m-%d')} (UTC)")
+        lines.append("")
+        lines.append("## Links")
+        if reg.get('drive_root_folder_id'):
+            lines.append(f"- Drive Root: https://drive.google.com/drive/folders/{reg['drive_root_folder_id']}")
+        if reg.get('spec_gdoc_id'):
+            lines.append(f"- Spec: https://docs.google.com/document/d/{reg['spec_gdoc_id']}/edit")
+        if reg.get('control_panel_gdoc_id'):
+            lines.append(f"- Control Panel Doc: https://docs.google.com/document/d/{reg['control_panel_gdoc_id']}/edit")
+        lines.append("")
+        lines.append("## Invariants (L1)")
+        lines.append("- See: ledgers/INVARIANTS.md (grep by Project + common)")
+        lines.append("")
+        lines.append("## Latest Decisions")
+        if not decisions:
+            lines.append("- (none indexed yet; run longterm-memory-index index_build)")
+        else:
+            for it in decisions:
+                lines.append(f"- {it['date']} | {it['summary']} ({it['source']})")
+        lines.append("")
+        lines.append("## Latest Changes")
+        if not changes:
+            lines.append("- (none indexed yet; run longterm-memory-index index_build)")
+        else:
+            for it in changes:
+                lines.append(f"- {it['date']} | {it['summary']} ({it['source']})")
+        lines.append("")
+        lines.append("## Fast Query")
+        lines.append(f"- python3 longterm-memory-index/scripts/index_query.py --db <workspace>/data/ledger_index.sqlite --q \"{slug}\" --limit 5")
+
+        print("\n".join(lines).strip())
         return
 
 
